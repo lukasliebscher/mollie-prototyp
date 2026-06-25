@@ -1,0 +1,1289 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+</head>
+<body>
+<title>Kartenzahlung mit Mollie einrichten – helloCash</title>
+<style>
+  :root {
+    --ground: #f3f4f4;
+    --card: #ffffff;
+    --text: #3d4856;
+    --body: #676a6c;
+    --muted: #999c9e;
+    --line: #e7eaec;
+    --line-strong: #dadce0;
+    --accent: #08afdf;
+    --accent-deep: #0089b8;
+    --accent-soft: #e4f6fc;
+    --save: #1faf6a;
+    --save-soft: #e6f7ef;
+    --bad: #e2574c;
+    --bad-soft: #fdeae8;
+    --font: "Lato", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font);
+    color: var(--body);
+    background: #e9ebec;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root { min-height: 100vh; }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    box-shadow: 0 1px 2px rgba(61,72,86,.04), 0 16px 44px -26px rgba(61,72,86,.28);
+    overflow: hidden;
+  }
+
+  /* ---- top bar ---- */
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px 0;
+  }
+  .brand { font-weight: 800; font-size: 18px; letter-spacing: -.01em; color: var(--text); }
+  .brand span { color: var(--accent); }
+  .count { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 700; }
+
+  /* ---- section stepper ---- */
+  .stepper { display: flex; align-items: flex-start; padding: 16px 24px 0; }
+  .snode { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
+  .sdot {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--card);
+    color: var(--muted); display: grid; place-items: center; font-size: 12px; font-weight: 800;
+    border: 2px solid var(--line); transition: .25s;
+  }
+  .snode.active .sdot { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
+  .snode.done .sdot { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .slabel { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .snode.active .slabel, .snode.done .slabel { color: var(--text); }
+  .sline { flex: 1; height: 2px; background: var(--line); margin: 13px 8px 0; border-radius: 99px; transition: .25s; }
+  .sline.done { background: var(--accent); }
+
+  .pfill { height: 5px; margin: 16px 24px 0; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .pfill > i {
+    display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px;
+    transition: width .45s cubic-bezier(.22,.61,.36,1);
+  }
+
+  /* ---- body ---- */
+  .pane { padding: 24px 24px 28px; }
+
+  .eyebrow { font-size: 11.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  .q { font-weight: 800; font-size: clamp(21px, 5.2vw, 27px); line-height: 1.15; letter-spacing: -.02em; color: var(--text); margin: 0 0 22px; text-wrap: balance; }
+  .q small { display: block; font-weight: 500; font-size: 15px; line-height: 1.4; letter-spacing: 0; color: var(--muted); margin-top: 9px; text-wrap: pretty; }
+
+  /* ---- choice options ---- */
+  .options { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .options.col { grid-template-columns: 1fr; }
+  .opt {
+    appearance: none; text-align: left; font-family: var(--font);
+    background: #fbfcfd; border: 1.5px solid var(--line); border-radius: 13px;
+    padding: 16px; cursor: pointer; display: flex; align-items: center; gap: 13px;
+    color: var(--text); transition: border-color .15s, background .15s, transform .08s;
+  }
+  .opt:hover { border-color: var(--line-strong); background: #fff; }
+  .opt:active { transform: scale(.985); }
+  .opt:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 1px; border-color: var(--accent); }
+  .opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .opt .emoji { font-size: 24px; line-height: 1; flex: none; }
+  .opt .lbl { font-size: 15.5px; font-weight: 700; line-height: 1.25; }
+  .opt .sub { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+
+  /* ---- form fields ---- */
+  .fields { display: flex; flex-wrap: wrap; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 100%; min-width: 0; }
+  .field > label { font-size: 12.5px; font-weight: 800; color: var(--text); letter-spacing: .01em; }
+  .field > label .opt-tag { color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; }
+  .field input, .field select, .field textarea {
+    font-family: var(--font); font-size: 15px; color: var(--text); background: #fff;
+    border: 1.5px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field input::placeholder, .field textarea::placeholder { color: #bfc3c5; }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field textarea { resize: vertical; min-height: 96px; line-height: 1.45; }
+  .field .hint { font-size: 12px; color: var(--muted); }
+  .field .err { font-size: 12px; color: var(--bad); font-weight: 700; display: none; }
+  .field.bad input, .field.bad select, .field.bad textarea { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+  .field.bad .err { display: block; }
+
+  .checks { flex: 1 1 100%; display: grid; gap: 10px; }
+  .check {
+    display: flex; gap: 12px; align-items: flex-start; border: 1.5px solid var(--line);
+    border-radius: 12px; padding: 13px 14px; cursor: pointer; background: #fbfcfd; transition: .15s;
+  }
+  .check:hover { border-color: var(--line-strong); background: #fff; }
+  .check.on { border-color: var(--accent); background: var(--accent-soft); }
+  .check .box {
+    flex: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-strong);
+    display: grid; place-items: center; font-size: 13px; color: #fff; background: #fff; transition: .15s; margin-top: 1px;
+  }
+  .check.on .box { background: var(--accent); border-color: var(--accent); }
+  .check .ctxt b { display: block; font-size: 14.5px; color: var(--text); font-weight: 700; }
+  .check .ctxt span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+  /* ---- footer / nav ---- */
+  .nav { margin-top: 24px; display: flex; align-items: center; gap: 12px; }
+  .back {
+    appearance: none; background: none; border: none; font-family: var(--font);
+    font-size: 14px; font-weight: 700; color: var(--muted); cursor: pointer; padding: 6px 4px; border-radius: 8px;
+  }
+  .back:hover { color: var(--text); }
+  .back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nav .back { margin-right: auto; }
+
+  .cta, .next {
+    appearance: none; font-family: var(--font); font-weight: 800; color: #fff;
+    background: var(--accent); border: none; cursor: pointer;
+    box-shadow: 0 8px 18px -8px rgba(8,175,223,.7); transition: background .15s, transform .08s;
+  }
+  .cta { font-size: 16.5px; letter-spacing: -.01em; border-radius: 13px; padding: 16px 22px; width: 100%; }
+  .next { font-size: 15px; border-radius: 12px; padding: 13px 26px; }
+  .cta:hover, .next:hover { background: var(--accent-deep); }
+  .cta:active, .next:active { transform: scale(.99); }
+  .cta:focus-visible, .next:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+
+  /* ---- intro ---- */
+  .intro .kicker { font-weight: 800; font-size: clamp(25px, 6.4vw, 33px); line-height: 1.1; letter-spacing: -.025em; color: var(--text); margin: 4px 0 14px; text-wrap: balance; }
+  .intro p { font-size: 16px; line-height: 1.5; color: var(--body); margin: 0 0 24px; max-width: 46ch; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+  .tag { font-size: 13px; font-weight: 700; color: var(--accent-deep); background: var(--accent-soft); border-radius: 99px; padding: 7px 13px; }
+
+  /* ---- plan / tarif ---- */
+  .plan-head { text-align: center; padding: 26px 24px 0; }
+  .plan-head .eyebrow { color: var(--accent); }
+  .plan-head h2 { font-weight: 800; font-size: clamp(21px, 5vw, 26px); letter-spacing: -.02em; color: var(--text); margin: 0 0 6px; line-height: 1.15; }
+  .plan-head p.lead { font-size: 14.5px; color: var(--body); margin: 0 0 16px; }
+
+  .toggle { display: inline-flex; background: var(--ground); border: 1px solid var(--line); border-radius: 99px; padding: 4px; gap: 4px; }
+  .toggle button { appearance: none; border: none; background: none; font-family: var(--font); font-weight: 800; font-size: 14px; color: var(--body); padding: 8px 20px; border-radius: 99px; cursor: pointer; transition: .15s; }
+  .toggle button.on { background: var(--accent); color: #fff; box-shadow: 0 4px 10px -5px rgba(8,175,223,.7); }
+  .save-note { font-size: 13px; color: var(--save); font-weight: 700; margin: 12px 0 0; }
+  .save-note b { color: var(--save); }
+
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; padding: 22px 24px 0; }
+  .plan {
+    position: relative; border: 2px solid var(--line); border-radius: 16px; padding: 22px 16px 16px;
+    background: #fff; cursor: pointer; text-align: center; transition: border-color .18s, background .18s, box-shadow .18s, transform .08s;
+  }
+  .plan:hover { border-color: var(--line-strong); }
+  .plan:active { transform: scale(.992); }
+  .plan:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+  .plan.sel { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 14px 32px -20px rgba(8,175,223,.85); }
+  .plan .rec {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 5px 11px; border-radius: 99px; white-space: nowrap;
+  }
+  .plan .pick {
+    position: absolute; top: 13px; right: 13px; width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid var(--line-strong); background: #fff; transition: .15s; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800;
+  }
+  .plan.sel .pick { border-color: var(--accent); background: var(--accent); }
+  .plan .pname { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--body); margin: 4px 0 10px; }
+  .plan .price { font-size: 27px; font-weight: 800; color: var(--text); letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .plan .price .per { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 5px; letter-spacing: 0; }
+  .plan .fee { display: inline-block; margin-top: 12px; font-size: 13px; font-weight: 800; color: var(--accent-deep); background: var(--accent-soft); border-radius: 99px; padding: 5px 12px; }
+  .plan.sel .fee { background: #fff; }
+  .plan ul { list-style: none; margin: 16px 0 0; padding: 15px 0 0; border-top: 1px solid var(--line); display: grid; gap: 9px; text-align: left; }
+  .plan.sel ul { border-color: rgba(8,175,223,.22); }
+  .plan li { display: flex; gap: 8px; font-size: 12.5px; color: var(--text); line-height: 1.35; }
+  .plan li .t { color: var(--accent-deep); font-weight: 800; flex: none; }
+
+  .why { margin: 18px 24px 0; background: #fbfcfd; border: 1.5px solid var(--line); border-radius: 12px; padding: 13px 15px; display: flex; gap: 11px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--body); }
+  .why .ic { font-size: 18px; flex: none; }
+  .why b { color: var(--text); font-weight: 800; }
+  .plan-actions { padding: 18px 24px 26px; display: grid; gap: 10px; }
+
+  /* ---- result / confirmation ---- */
+  .result .band { background: var(--accent); color: #fff; padding: 28px 24px 24px; }
+  .result .badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+    background: rgba(255,255,255,.22); padding: 5px 11px; border-radius: 99px; margin-bottom: 14px;
+  }
+  .result .sol { font-weight: 800; font-size: clamp(24px, 6vw, 30px); line-height: 1.12; letter-spacing: -.02em; margin: 0 0 10px; }
+  .result .sol-sub { font-size: 15px; line-height: 1.45; margin: 0; color: rgba(255,255,255,.92); max-width: 44ch; }
+  .setup { padding: 20px 24px 4px; }
+  .setup h3 { font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .row { display: flex; gap: 12px; align-items: flex-start; padding: 11px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: none; }
+  .row .ic { font-size: 19px; line-height: 1.2; flex: none; width: 24px; text-align: center; }
+  .row .k { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .row .v { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; margin-top: 1px; }
+  .result .actions { padding: 18px 24px 26px; display: grid; gap: 10px; }
+
+  /* ---- pairing / coupling ---- */
+  .sheet { padding: 22px 24px 26px; }
+  .callout { border-radius: 12px; padding: 14px 16px; font-size: 13.5px; line-height: 1.5; margin-bottom: 12px; }
+  .callout h4 { margin: 0 0 5px; font-size: 14.5px; font-weight: 800; }
+  .callout.info { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+  .callout.info h4 { color: var(--accent-deep); }
+  .callout.info p { margin: 0; color: var(--body); }
+  .callout.ok { background: var(--save-soft); border-left: 4px solid var(--save); color: #157a4b; }
+
+  .qrbox { margin: 18px auto 0; width: max-content; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: 0 10px 26px -20px rgba(61,72,86,.6); }
+  .qrbox canvas { display: block; }
+
+  .pcode { margin: 18px 0 0; text-align: center; }
+  .pcode .lbl { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .pcode .row2 { margin-top: 7px; display: inline-flex; align-items: center; gap: 9px; }
+  .pcode code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 17px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
+  .copybtn { appearance: none; border: 1.5px solid var(--line); background: #fff; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; color: var(--body); display: grid; place-items: center; font-size: 14px; transition: .15s; }
+  .copybtn:hover { border-color: var(--accent); color: var(--accent-deep); }
+  .copybtn:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 1px; }
+  .copybtn.done { border-color: var(--save); color: var(--save); }
+
+  .hint-c { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .waiting { margin: 20px 0 0; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--body); font-size: 13.5px; font-weight: 700; }
+  .spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+  /* ---- app phone frame ---- */
+  .phone { max-width: 340px; margin: 8px auto; background: #0c0c0e; border-radius: 30px; color: #fff; box-shadow: 0 28px 56px -30px rgba(0,0,0,.7); overflow: hidden; }
+  .phone .status { display: flex; align-items: center; justify-content: space-between; padding: 13px 24px 0; font-size: 14px; font-weight: 700; }
+  .phone .status .time { display: inline-flex; align-items: center; gap: 6px; }
+  .phone .app { padding: 14px 22px 24px; }
+  .apphead { display: flex; flex-direction: column; align-items: center; gap: 9px; position: relative; padding-top: 4px; }
+  .nav-back { position: absolute; left: -6px; top: -2px; background: none; border: none; color: #fff; font-size: 30px; line-height: 1; cursor: pointer; padding: 2px 8px; }
+  .nav-back:hover { opacity: .8; }
+  .mlogo { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(160deg, #5bb6e0, #2f93c9); display: grid; place-items: center; box-shadow: 0 6px 14px -6px rgba(47,147,201,.8); }
+  .acct { font-size: 15px; font-weight: 700; color: #fff; }
+
+  .tap-title { text-align: center; font-size: 19px; font-weight: 800; margin: 24px 0 6px; }
+  .tap-sub { text-align: center; font-size: 13px; color: #9aa0a6; line-height: 1.5; margin: 0 0 22px; }
+  .tap-field label { display: block; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: #9aa0a6; margin-bottom: 8px; }
+  .tap-field input { width: 100%; font-family: ui-monospace, Menlo, monospace; font-size: 16px; letter-spacing: .04em; color: #fff; background: #19191c; border: 1.5px solid #2c2c31; border-radius: 12px; padding: 14px; }
+  .tap-field input:focus { outline: none; border-color: #3fa7d6; }
+  .tap-btn { width: 100%; margin-top: 22px; appearance: none; border: none; border-radius: 13px; padding: 15px; font-family: var(--font); font-size: 16px; font-weight: 800; color: #fff; background: linear-gradient(160deg, #39a6d8, #2f93c9); cursor: pointer; }
+  .tap-btn:active { transform: scale(.99); }
+
+  .amount { text-align: center; font-size: clamp(46px, 16vw, 60px); font-weight: 800; letter-spacing: -.03em; margin: 24px 0 0; font-variant-numeric: tabular-nums; }
+  .desc-pill { display: block; margin: 18px auto 0; background: #1b1b1f; border: none; color: #fff; font-size: 15px; font-weight: 600; border-radius: 12px; padding: 13px 22px; cursor: pointer; }
+  .desc-pill span { color: #7fd0f0; font-weight: 800; margin-right: 5px; }
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 24px 0 0; }
+  .key { appearance: none; background: #161619; border: 1px solid #232327; border-radius: 12px; color: #fff; font-size: 23px; font-weight: 600; padding: 15px 0; cursor: pointer; transition: .1s; }
+  .key:active { background: #28282d; transform: scale(.97); }
+  .key.del { display: grid; place-items: center; font-size: 20px; }
+  .pay-btn { width: 100%; margin-top: 18px; appearance: none; border: none; border-radius: 14px; padding: 18px; font-family: var(--font); font-size: 17px; font-weight: 700; color: #8a8a90; background: #1f1f23; cursor: not-allowed; transition: .15s; }
+  .pay-btn.on { color: #fff; background: linear-gradient(160deg, #39a6d8, #2f93c9); cursor: pointer; }
+
+  /* ---- Kartenzahlung modal animation ---- */
+  .kz-head { text-align: center; font-size: 19px; font-weight: 700; color: var(--text); padding: 22px 24px 18px; border-bottom: 1px solid var(--line); }
+  .kz-body { padding: 26px 24px 28px; text-align: center; }
+  .payviz { position: relative; width: 150px; height: 200px; margin: 0 auto 4px; }
+  .viz-phone { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 104px; height: 168px; background: #15171a; border-radius: 20px; border: 3px solid #0c0d0f; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; box-shadow: 0 18px 30px -18px rgba(0,0,0,.5); }
+  .viz-ring { width: 46px; height: 46px; border-radius: 50%; border: 2px solid #3a3d42; position: relative; display: grid; place-items: center; }
+  .nfc { position: absolute; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; animation: nfc 1.8s ease-out infinite; }
+  .nfc:nth-child(2) { animation-delay: .6s; }
+  .nfc:nth-child(3) { animation-delay: 1.2s; }
+  @keyframes nfc { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.95); opacity: 0; } }
+  .viz-amt { font-size: 13px; font-weight: 800; color: #fff; }
+  .viz-ready { font-size: 8px; letter-spacing: .08em; color: #8a9099; text-transform: uppercase; }
+  .viz-card { position: absolute; top: 0; left: 50%; width: 96px; height: 60px; border-radius: 9px; background: linear-gradient(135deg, #3aa0e0, #2f7fc4); box-shadow: 0 12px 22px -10px rgba(47,127,196,.75); transform: translateX(-58%) rotate(-12deg); animation: cardbob 2.4s ease-in-out infinite; }
+  @keyframes cardbob { 0%,100% { transform: translateX(-58%) rotate(-12deg) translateY(0); } 50% { transform: translateX(-58%) rotate(-12deg) translateY(-7px); } }
+  .viz-card .chip { position: absolute; top: 12px; left: 11px; width: 14px; height: 11px; border-radius: 3px; background: #f2c94c; }
+  .viz-card .cwave { position: absolute; top: 10px; right: 10px; }
+  .viz-card .cnum { position: absolute; bottom: 17px; left: 11px; font-size: 8px; color: rgba(255,255,255,.92); letter-spacing: 1px; }
+  .viz-card .cname { position: absolute; bottom: 6px; left: 11px; font-size: 7px; color: rgba(255,255,255,.82); letter-spacing: .5px; }
+  .kz-amt { font-size: 30px; font-weight: 800; color: var(--text); letter-spacing: -.02em; margin: 14px 0 12px; }
+  .kz-line { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .kz-line .dots { display: inline-flex; gap: 6px; }
+  .kz-line .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
+  .kz-line .dots i.on { background: var(--accent); }
+  .kz-status { font-size: 14px; font-weight: 700; color: var(--body); }
+  .kz-done { width: 56px; height: 56px; border-radius: 50%; background: var(--save); color: #fff; display: grid; place-items: center; font-size: 30px; margin: 4px auto 4px; }
+  @media (prefers-reduced-motion: reduce) { .nfc, .viz-card { animation: none; } }
+
+  /* ---- landing / registration ---- */
+  .landing { min-height: 100vh; background: linear-gradient(120deg, #3f9ad0 0%, #5fb0db 55%, #7cc0e3 100%); padding: 34px clamp(20px, 6vw, 88px) 60px; }
+  .hc-logo { display: inline-flex; align-items: center; gap: 9px; color: #fff; font-size: 21px; font-weight: 300; letter-spacing: .01em; }
+  .hc-logo b { font-weight: 800; }
+  .hc-logo span { display: inline-flex; gap: 2px; }
+  .landing-wrap { display: grid; grid-template-columns: 1.15fr .85fr; gap: clamp(28px, 6vw, 90px); align-items: center; max-width: 1240px; margin: clamp(30px, 7vw, 70px) auto 0; }
+  .landing-hero h1 { color: #fff; font-size: clamp(34px, 5.4vw, 56px); font-weight: 800; line-height: 1.08; letter-spacing: -.025em; margin: 0 0 22px; text-wrap: balance; }
+  .landing-hero p { color: rgba(255,255,255,.92); font-size: clamp(15px, 1.6vw, 18px); line-height: 1.5; margin: 0 0 18px; max-width: 46ch; }
+  .stars { color: #ffc73a; font-size: 22px; letter-spacing: 3px; margin-bottom: 8px; }
+  .rated { color: #fff; font-weight: 800; font-size: 15px; margin: 0; }
+  .signup { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); backdrop-filter: blur(4px); border-radius: 16px; padding: 30px 32px; box-shadow: 0 24px 50px -28px rgba(0,0,0,.4); }
+  .signup h2 { color: #fff; font-size: 22px; font-weight: 800; margin: 0 0 12px; }
+  .signup > p { color: rgba(255,255,255,.94); font-size: 16px; line-height: 1.5; margin: 0 0 22px; }
+  .su-label { display: block; color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 8px; }
+  .signup input { width: 100%; border: none; border-radius: 8px; padding: 13px 14px; font-family: var(--font); font-size: 15px; color: var(--text); background: #fff; }
+  .signup input:focus { outline: 3px solid rgba(255,255,255,.5); }
+  .su-btn { width: 100%; margin-top: 16px; appearance: none; border: none; border-radius: 8px; padding: 15px; font-family: var(--font); font-size: 17px; font-weight: 700; color: #fff; background: var(--accent); cursor: pointer; transition: background .15s; }
+  .su-btn:hover { background: var(--accent-deep); }
+  .su-fine { color: rgba(255,255,255,.82); font-size: 12.5px; line-height: 1.5; margin: 18px 0 0; }
+  .su-fine a { color: #fff; text-decoration: underline; }
+
+  /* ---- helloCash backoffice ---- */
+  .bo { display: flex; min-height: 100vh; background: #f4f5f6; }
+  .bo-side { width: 232px; flex: none; background: #2a3a48; color: #c4ccd4; padding: 0; }
+  .bo-company { padding: 18px 20px; }
+  .bo-cn { color: #fff; font-weight: 800; font-size: 14.5px; }
+  .bo-cl { font-size: 12.5px; color: #9aa7b2; margin-top: 2px; }
+  .bo-nav { display: flex; flex-direction: column; }
+  .bo-item { display: flex; align-items: center; gap: 9px; padding: 13px 20px; font-size: 14px; font-weight: 700; color: #c4ccd4; cursor: pointer; border-left: 3px solid transparent; }
+  .bo-item.active { background: #22303c; color: #fff; border-left-color: var(--accent); }
+  .bo-new { background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; text-transform: lowercase; }
+  .bo-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .bo-top { display: flex; align-items: center; gap: 16px; padding: 12px 22px; background: #fff; border-bottom: 1px solid #e7eaec; font-size: 13px; color: var(--body); }
+  .bo-burger { font-size: 18px; color: var(--muted); }
+  .bo-search { color: var(--muted); flex: 1; max-width: 280px; }
+  .bo-top-r { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+  .bo-products { background: #f0932b; color: #fff; font-weight: 700; padding: 6px 11px; border-radius: 5px; }
+  .bo-top-r b { color: var(--accent); }
+  .bo-content { padding: 26px clamp(18px, 3vw, 34px); }
+  .bo-h1 { font-size: 24px; font-weight: 400; color: #5a6570; margin: 0 0 20px; }
+  .bo-hero { background: linear-gradient(110deg, #eef9fd, #e0f3fb 60%, #f3fbfe); border: 1px solid #d6eef7; border-radius: 12px; padding: 30px clamp(20px, 3vw, 38px); display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: center; overflow: hidden; }
+  .bo-badge { display: inline-block; background: #cdebf6; color: var(--accent-deep); font-size: 11px; font-weight: 800; letter-spacing: .08em; padding: 6px 11px; border-radius: 7px; margin-bottom: 14px; }
+  .bo-hero-txt h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 800; color: #2c3742; margin: 0 0 8px; }
+  .bo-hero-txt > p { font-size: 14.5px; color: var(--body); margin: 0 0 18px; max-width: 52ch; }
+  .bo-offer { background: #fff; border-radius: 12px; padding: 14px 20px; box-shadow: 0 8px 22px -16px rgba(0,0,0,.35); display: inline-flex; flex-direction: column; margin-bottom: 18px; }
+  .bo-offer-k { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
+  .bo-offer b { font-size: clamp(20px, 2.6vw, 27px); font-weight: 800; color: #20262c; letter-spacing: -.01em; }
+  .bo-list { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 9px; }
+  .bo-list li { font-size: 14px; color: #3d4856; }
+  .bo-cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .bo-btn-primary { appearance: none; border: none; background: var(--accent); color: #fff; font-family: var(--font); font-weight: 700; font-size: 14px; padding: 11px 16px; border-radius: 7px; cursor: pointer; }
+  .bo-btn-primary:hover { background: var(--accent-deep); }
+  .bo-btn-ghost { appearance: none; background: #fff; border: 1px solid var(--accent); color: var(--accent-deep); font-family: var(--font); font-weight: 700; font-size: 14px; padding: 11px 16px; border-radius: 7px; cursor: pointer; }
+  .bo-hero-viz { display: flex; justify-content: center; }
+  .termviz { perspective: 800px; }
+  .termphone { width: 150px; background: #111418; border-radius: 22px; padding: 14px 12px; transform: rotateY(-22deg) rotateX(6deg) rotate(6deg); box-shadow: -18px 26px 40px -22px rgba(0,0,0,.5); color: #fff; }
+  .term-top { display: flex; justify-content: center; }
+  .term-top .mlogo { width: 26px; height: 26px; border-radius: 8px; }
+  .term-amt { text-align: center; font-size: 24px; font-weight: 800; margin: 12px 0 6px; }
+  .term-desc { text-align: center; font-size: 8px; color: #8a9099; margin-bottom: 12px; }
+  .term-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .term-pad span { background: #1b1f24; border-radius: 5px; font-size: 11px; text-align: center; padding: 7px 0; color: #d6dbe0; }
+  .bo-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 26px; background: #fff; border: 1px solid #e7eaec; border-radius: 12px; padding: 26px clamp(20px, 3vw, 34px); }
+  .bo-feat-ic { width: 38px; height: 38px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-deep); display: grid; place-items: center; font-size: 17px; margin-bottom: 12px; }
+  .bo-feat b { display: block; font-size: 15px; color: var(--text); margin-bottom: 6px; }
+  .bo-feat p { font-size: 13.5px; color: var(--body); line-height: 1.5; margin: 0; }
+
+  /* ---- survey modal over backoffice ---- */
+  .modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 28px 18px; }
+  .modal-backdrop { position: absolute; inset: 0; background: rgba(20,26,33,.55); backdrop-filter: blur(2px); animation: fade .3s ease both; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .modal-card { position: relative; z-index: 1; width: 100%; max-width: 580px; max-height: calc(100vh - 48px); overflow: auto; border-radius: var(--radius); animation: rise .4s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
+  .modal-x { position: absolute; z-index: 2; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; border: none; background: #fff; color: var(--body); font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 6px 16px -6px rgba(0,0,0,.4); }
+  .modal-x:hover { color: var(--text); }
+  @media (max-width: 520px) { .modal-x { top: 6px; right: 6px; } }
+
+  @media (max-width: 860px) {
+    .landing-wrap { grid-template-columns: 1fr; }
+    .bo-hero { grid-template-columns: 1fr; }
+    .bo-hero-viz { display: none; }
+    .bo-features { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    .bo-side { display: none; }
+  }
+
+  /* ---- transitions ---- */
+  .anim { animation: enter .42s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .opt, .field, .plan { animation: pop .4s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) { *, .anim, .opt, .field, .plan { animation: none !important; transition: none !important; } }
+  @media (max-width: 440px) {
+    .options { grid-template-columns: 1fr; }
+    .plans { grid-template-columns: 1fr; }
+    .field[data-w] { flex-basis: 100% !important; }
+    .slabel { font-size: 9.5px; }
+  }
+</style>
+
+<div id="root"></div>
+
+<script>
+  const SECTIONS = [
+    { id: "unternehmen", label: "Unternehmen" },
+    { id: "eigentuemer", label: "Eigentümer" },
+    { id: "tarif", label: "Tarif" },
+  ];
+
+  const RECHTSFORMEN = [
+    "Einzelunternehmen", "OG (Offene Gesellschaft)", "KG (Kommanditgesellschaft)",
+    "GmbH", "GmbH & Co KG", "AG (Aktiengesellschaft)", "Verein", "Freiberufler:in", "Sonstige",
+  ];
+  const LAENDER = ["Österreich", "Deutschland", "Schweiz", "Italien", "Slowenien", "Tschechien", "Slowakei", "Ungarn", "Frankreich", "Spanien"];
+
+  // Each step belongs to a section. type: choice | form | plan
+  const STEPS = [
+    {
+      id: "branche", section: "unternehmen", type: "choice",
+      eyebrow: "Über dein Geschäft", q: "Was machst du?", sub: "Nur damit wir wissen, worum es geht.",
+      cols: 2,
+      options: [
+        { emoji: "💇", lbl: "Friseur / Beauty", val: "friseur" },
+        { emoji: "☕", lbl: "Café / Gastro", val: "gastro" },
+        { emoji: "🛍️", lbl: "Laden / Verkauf", val: "laden" },
+        { emoji: "🛠️", lbl: "Dienstleistung", val: "dienst" },
+      ],
+    },
+    {
+      id: "volumen", section: "unternehmen", type: "choice",
+      eyebrow: "Über dein Geschäft", q: "Wie oft zahlen deine Kund:innen mit Karte?",
+      sub: "Daraus schlagen wir dir am Ende den passenden Tarif vor.",
+      cols: 1,
+      options: [
+        { emoji: "🪙", lbl: "Eher selten", sub: "ein paar Kartenzahlungen pro Woche", val: "selten" },
+        { emoji: "💳", lbl: "Regelmäßig", sub: "täglich ein paar Karten dabei", val: "regelmaessig" },
+        { emoji: "🔁", lbl: "Sehr oft", sub: "Karte ist bei mir die Hauptzahlart", val: "oft" },
+      ],
+    },
+    {
+      id: "karte", section: "unternehmen", type: "choice",
+      eyebrow: "Über dein Geschäft", q: "Womit liest du die Karten ein?",
+      sub: "Das entscheidet, wie wir dein Kartenlesegerät später koppeln.",
+      cols: 1,
+      options: [
+        { emoji: "📲", lbl: "Mit genau diesem Gerät", sub: "Tap to Pay – dein Smartphone liest die Karte selbst", val: "self" },
+        { emoji: "📱", lbl: "Mit einem separaten Smartphone", sub: "ein zweites Handy als Kartenleser", val: "phone" },
+        { emoji: "💳", lbl: "Mit einem Kartenterminal", sub: "ein eigenes Gerät zum Draufhalten oder Stecken", val: "terminal" },
+      ],
+    },
+    {
+      id: "os", section: "unternehmen", type: "choice",
+      cond: (a) => a.karte === "self" || a.karte === "phone",
+      eyebrow: "Über dein Geschäft", q: "Ist das Smartphone von Apple oder Android?",
+      sub: "Danach öffnen wir später die richtige Mollie-App für dich.",
+      cols: 2,
+      options: [
+        { emoji: "🍏", lbl: "Apple (iPhone / iPad)", val: "apple" },
+        { emoji: "🤖", lbl: "Android", val: "android" },
+      ],
+    },
+    {
+      id: "firma", section: "unternehmen", type: "form",
+      eyebrow: "Unternehmen", q: "Wie heißt dein Unternehmen?",
+      fields: [
+        { name: "firmenname", label: "Name des Unternehmens", type: "text", placeholder: "Dein Firmenname", required: true, maxlength: 50, hint: "max. 50 Zeichen" },
+        { name: "rechtsform", label: "Rechtsform", type: "select", required: true, options: RECHTSFORMEN, placeholder: "Bitte auswählen" },
+      ],
+    },
+    {
+      id: "adresse", section: "unternehmen", type: "form",
+      eyebrow: "Unternehmen", q: "Wo ist dein Unternehmen ansässig?",
+      fields: [
+        { name: "strasse", label: "Straße", type: "text", placeholder: "Straße", required: true, w: "60%" },
+        { name: "hausnummer", label: "Hausnr.", type: "text", placeholder: "1", required: true, w: "28%" },
+        { name: "plz", label: "Postleitzahl", type: "text", placeholder: "1010", required: true, w: "28%" },
+        { name: "stadt", label: "Stadt", type: "text", placeholder: "Wien", required: true, w: "60%" },
+      ],
+    },
+    {
+      id: "kontakt", section: "unternehmen", type: "form",
+      eyebrow: "Unternehmen", q: "Wie erreichen wir dein Unternehmen?",
+      fields: [
+        { name: "telefon", label: "Telefonnummer", type: "tel", placeholder: "+43 …", required: true },
+        { name: "webseite", label: "Webseite <span class='opt-tag'>(optional)</span>", type: "url", placeholder: "https://…" },
+      ],
+    },
+    {
+      id: "register", section: "unternehmen", type: "form",
+      eyebrow: "Unternehmen", q: "Hast du eine UID- oder Firmenbuchnummer?",
+      sub: "Beide Felder sind optional – lass sie leer, wenn du keine hast.",
+      fields: [
+        { name: "uid", label: "UID-Nummer <span class='opt-tag'>(optional)</span>", type: "text", placeholder: "ATU…", w: "48%" },
+        { name: "firmenbuch", label: "Firmenbuchnummer <span class='opt-tag'>(optional)</span>", type: "text", placeholder: "FN …", w: "48%" },
+      ],
+    },
+    {
+      id: "beschreibung", section: "unternehmen", type: "form",
+      eyebrow: "Unternehmen", q: "Beschreib dein Unternehmen kurz.",
+      sub: "Mollie braucht das zur Prüfung. Mindestens 50 Zeichen.",
+      fields: [
+        { name: "beschreibung", label: "Beschreibung", type: "textarea", placeholder: "Was bietest du an, für wen?", required: true, min: 50, hint: "mindestens 50 Zeichen" },
+      ],
+    },
+    {
+      id: "person", section: "eigentuemer", type: "form",
+      eyebrow: "Eigentümer", q: "Wer ist der/die Eigentümer:in?",
+      fields: [
+        { name: "vorname", label: "Vorname", type: "text", placeholder: "Vorname", required: true, w: "48%" },
+        { name: "nachname", label: "Nachname", type: "text", placeholder: "Nachname", required: true, w: "48%" },
+      ],
+    },
+    {
+      id: "geburt", section: "eigentuemer", type: "form",
+      eyebrow: "Eigentümer", q: "Geburtsdatum und Geburtsland?",
+      fields: [
+        { name: "geburtsdatum", label: "Geburtsdatum", type: "date", required: true, w: "48%" },
+        { name: "geburtsland", label: "Geburtsland", type: "select", required: true, options: LAENDER, placeholder: "Land wählen", w: "48%" },
+      ],
+    },
+    {
+      id: "herkunft", section: "eigentuemer", type: "form",
+      eyebrow: "Eigentümer", q: "Nationalität und Wohnsitzland?",
+      fields: [
+        { name: "nationalitaet", label: "Nationalität", type: "select", required: true, options: LAENDER, placeholder: "Land wählen", w: "48%" },
+        { name: "wohnsitzland", label: "Wohnsitzland", type: "select", required: true, options: LAENDER, placeholder: "Land wählen", w: "48%" },
+      ],
+    },
+    {
+      id: "rolle", section: "eigentuemer", type: "form",
+      eyebrow: "Eigentümer", q: "Noch ein paar Angaben zu deiner Rolle.",
+      fields: [
+        { name: "vertreter", label: "", type: "checkbox", title: "Ich bin gesetzliche:r Vertreter:in", desc: "z. B. Geschäftsführer:in, die das Unternehmen rechtlich vertritt." },
+        { name: "ubo", label: "", type: "checkbox", title: "Ich bin wirtschaftliche:r Eigentümer:in (UBO)", desc: "Person, der mehr als 25 % des Unternehmens gehören." },
+        { name: "anteil", label: "Eigentumsanteil (%)", type: "number", placeholder: "100", required: true, value: "100", min: 0, max: 100, w: "48%" },
+      ],
+    },
+    { id: "tarif", section: "tarif", type: "plan" },
+  ];
+
+  const PLANS = {
+    flat: {
+      key: "flat", name: "Mollie Flat", baseMonthly: 1.90, feePct: "0,89 %", hasBase: true,
+      bullets: ["0,89 % pro Transaktion", "Planbare monatliche Grundgebühr", "Ideal bei vielen Kartenzahlungen"],
+    },
+    payperuse: {
+      key: "payperuse", name: "Mollie Pay-per-Use", baseMonthly: 0, feePct: "1,29 %", hasBase: false,
+      bullets: ["1,29 % pro Transaktion", "Keine monatlichen Grundgebühren", "Ideal bei wenigen Kartenzahlungen"],
+    },
+  };
+  const YEARLY_DISCOUNT = 0.08;
+
+  // Test prefill so the flow can be clicked through quickly. Set PREFILL = false to start empty.
+  const PREFILL = true;
+  const TEST_DATA = {
+    branche: "friseur", volumen: "oft", karte: "self", os: "apple",
+    firmenname: "Muster Friseur GmbH", rechtsform: "GmbH",
+    strasse: "Musterstraße", hausnummer: "12", plz: "1010", stadt: "Wien",
+    telefon: "+43 1 2345678", webseite: "https://muster-friseur.at",
+    uid: "ATU12345678", firmenbuch: "FN 123456a",
+    beschreibung: "Wir sind ein moderner Friseursalon im Herzen von Wien und bieten Schnitt, Farbe und Pflege für Damen und Herren.",
+    vorname: "Maria", nachname: "Muster",
+    geburtsdatum: "1985-06-15", geburtsland: "Österreich",
+    nationalitaet: "Österreich", wohnsitzland: "Österreich",
+    vertreter: true, ubo: true, anteil: "100",
+  };
+  const freshAnswers = () => (PREFILL ? { ...TEST_DATA } : {});
+
+  const state = { answers: freshAnswers(), plan: null, billing: "monthly" };
+  function resetState() { state.answers = freshAnswers(); state.plan = null; state.billing = "monthly"; }
+  const root = document.getElementById("root");
+  let card = null; // assigned when the survey modal mounts
+
+  const stepById = (id) => STEPS.find((s) => s.id === id);
+  const visible = () => STEPS.filter((s) => !s.cond || s.cond(state.answers));
+  const sectionIndex = (sid) => SECTIONS.findIndex((s) => s.id === sid);
+  const recommend = () => (state.answers.volumen === "selten" ? "payperuse" : "flat");
+  const eur = (n) => "€ " + n.toFixed(2).replace(".", ",");
+
+  function header(curId) {
+    const vis = visible();
+    const pos = vis.findIndex((s) => s.id === curId);
+    const curSecIdx = sectionIndex(vis[pos].section);
+
+    const nodes = SECTIONS.map((sec, i) => {
+      const cls = i < curSecIdx ? "snode done" : i === curSecIdx ? "snode active" : "snode";
+      const mark = i < curSecIdx ? "✓" : (i + 1);
+      const line = i < SECTIONS.length - 1 ? `<div class="sline ${i < curSecIdx ? "done" : ""}"></div>` : "";
+      return `<div class="${cls}"><div class="sdot">${mark}</div><div class="slabel">${sec.label}</div></div>${line}`;
+    }).join("");
+
+    const pct = Math.round(((pos + 1) / vis.length) * 100);
+    return `
+      <div class="bar">
+        <div class="brand">hello<span>Cash</span></div>
+        <div class="count">Schritt ${pos + 1} / ${vis.length}</div>
+      </div>
+      <div class="stepper">${nodes}</div>
+      <div class="pfill"><i style="width:${pct}%"></i></div>`;
+  }
+
+  function renderIntro() {
+    card.innerHTML = `
+      <div class="pane intro anim">
+        <p class="eyebrow">Kartenzahlung mit Mollie</p>
+        <h1 class="kicker">In wenigen Schritten startklar.</h1>
+        <p>Wir fragen kurz ein paar Eckdaten zu deinem Unternehmen und zu dir ab. Am Ende wählst du nur noch deinen Tarif – den passenden haben wir dir schon vorausgewählt.</p>
+        <div class="tags">
+          <span class="tag">⏱️ ~3 Minuten</span>
+          <span class="tag">🔒 Sicher mit Mollie</span>
+          <span class="tag">✏️ Schritt für Schritt</span>
+        </div>
+        <button class="cta" id="start">Los geht's</button>
+      </div>`;
+    const b = document.getElementById("start");
+    b.addEventListener("click", () => go(STEPS[0].id));
+    b.focus();
+  }
+
+  function go(id) {
+    const S = stepById(id);
+    if (S.type === "choice") renderChoice(S);
+    else if (S.type === "form") renderForm(S);
+    else renderPlan();
+  }
+
+  function prevId(id) {
+    const vis = visible();
+    const pos = vis.findIndex((s) => s.id === id);
+    return pos <= 0 ? null : vis[pos - 1].id;
+  }
+  function nextId(id) {
+    const vis = visible();
+    const pos = vis.findIndex((s) => s.id === id);
+    return pos >= vis.length - 1 ? null : vis[pos + 1].id;
+  }
+  function goBack(id) {
+    const p = prevId(id);
+    if (p === null) renderIntro();
+    else go(p);
+  }
+  function advance(id) {
+    const n = nextId(id);
+    if (n === null) renderPlan();
+    else go(n);
+  }
+
+  function renderChoice(S) {
+    const chosen = state.answers[S.id];
+    const opts = S.options.map((o, idx) => {
+      const sel = chosen === o.val ? " sel" : "";
+      const sub = o.sub ? `<span class="sub">${o.sub}</span>` : "";
+      return `<button class="opt${sel}" data-val="${o.val}" style="animation-delay:${idx * 45}ms">
+                <span class="emoji">${o.emoji}</span>
+                <span class="lbl">${o.lbl}${sub}</span>
+              </button>`;
+    }).join("");
+
+    card.innerHTML = `
+      ${header(S.id)}
+      <div class="pane anim">
+        <p class="eyebrow">${S.eyebrow}</p>
+        <h2 class="q">${S.q}${S.sub ? `<small>${S.sub}</small>` : ""}</h2>
+        <div class="options ${S.cols === 1 ? "col" : ""}">${opts}</div>
+        <div class="nav"><button class="back">← Zurück</button></div>
+      </div>`;
+
+    card.querySelectorAll(".opt").forEach((b) => {
+      b.addEventListener("click", () => { state.answers[S.id] = b.dataset.val; advance(S.id); });
+    });
+    card.querySelector(".back").addEventListener("click", () => goBack(S.id));
+  }
+
+  function fieldHTML(f, idx) {
+    const val = state.answers[f.name] ?? f.value ?? "";
+    const delay = `style="animation-delay:${idx * 40}ms;${f.w ? `flex-basis:${f.w}` : ""}"`;
+    const wattr = f.w ? `data-w="${f.w}"` : "";
+
+    if (f.type === "checkbox") {
+      const on = state.answers[f.name] ? " on" : "";
+      return `<label class="check${on}" data-name="${f.name}" style="animation-delay:${idx * 40}ms">
+                <input type="checkbox" ${state.answers[f.name] ? "checked" : ""}>
+                <span class="box">✓</span>
+                <span class="ctxt"><b>${f.title}</b><span>${f.desc}</span></span>
+              </label>`;
+    }
+
+    let control;
+    if (f.type === "select") {
+      const opts = [`<option value="" ${val ? "" : "selected"} disabled hidden>${f.placeholder || "Bitte auswählen"}</option>`]
+        .concat(f.options.map((o) => `<option value="${o}" ${val === o ? "selected" : ""}>${o}</option>`)).join("");
+      control = `<select data-name="${f.name}">${opts}</select>`;
+    } else if (f.type === "textarea") {
+      control = `<textarea data-name="${f.name}" placeholder="${f.placeholder || ""}">${val}</textarea>`;
+    } else {
+      const extra = (f.maxlength ? `maxlength="${f.maxlength}" ` : "") + (f.min != null ? `min="${f.min}" ` : "") + (f.max != null ? `max="${f.max}" ` : "");
+      control = `<input type="${f.type}" data-name="${f.name}" value="${val}" placeholder="${f.placeholder || ""}" ${extra}>`;
+    }
+
+    return `<div class="field" data-name="${f.name}" ${wattr} ${delay}>
+              <label>${f.label}</label>
+              ${control}
+              ${f.hint ? `<span class="hint">${f.hint}</span>` : ""}
+              <span class="err">Bitte ausfüllen.</span>
+            </div>`;
+  }
+
+  function renderForm(S) {
+    const fields = S.fields.map((f, i) => fieldHTML(f, i)).join("");
+    card.innerHTML = `
+      ${header(S.id)}
+      <div class="pane anim">
+        <p class="eyebrow">${S.eyebrow}</p>
+        <h2 class="q">${S.q}${S.sub ? `<small>${S.sub}</small>` : ""}</h2>
+        <div class="fields">${fields}</div>
+        <div class="nav">
+          <button class="back">← Zurück</button>
+          <button class="next">Weiter →</button>
+        </div>
+      </div>`;
+
+    card.querySelectorAll("[data-name] input, [data-name] select, [data-name] textarea").forEach((el) => {
+      const wrap = el.closest(".field, .check");
+      const name = wrap.dataset.name;
+      const handler = () => {
+        if (el.type === "checkbox") {
+          state.answers[name] = el.checked;
+          wrap.classList.toggle("on", el.checked);
+        } else {
+          state.answers[name] = el.value;
+          wrap.classList.remove("bad");
+        }
+      };
+      el.addEventListener("input", handler);
+      el.addEventListener("change", handler);
+    });
+
+    card.querySelector(".back").addEventListener("click", () => goBack(S.id));
+    card.querySelector(".next").addEventListener("click", () => {
+      if (validate(S)) advance(S.id);
+    });
+  }
+
+  function validate(S) {
+    let firstBad = null;
+    S.fields.forEach((f) => {
+      if (f.type === "checkbox") return;
+      const wrap = card.querySelector(`.field[data-name="${f.name}"]`);
+      const v = (state.answers[f.name] ?? "").toString().trim();
+      const errEl = wrap.querySelector(".err");
+      let bad = false, msg = "Bitte ausfüllen.";
+      if (f.required && !v) { bad = true; }
+      else if (f.min && v && v.length < f.min) { bad = true; msg = `Noch ${f.min - v.length} Zeichen.`; }
+      if (bad) { wrap.classList.add("bad"); if (errEl) errEl.textContent = msg; if (!firstBad) firstBad = wrap; }
+      else wrap.classList.remove("bad");
+    });
+    if (firstBad) { firstBad.querySelector("input,select,textarea")?.focus(); return false; }
+    return true;
+  }
+
+  function priceBlock(p) {
+    if (!p.hasBase) return `<div class="price">Keine<span class="per">Grundgebühr</span></div>`;
+    if (state.billing === "yearly") {
+      const m = p.baseMonthly * (1 - YEARLY_DISCOUNT);
+      return `<div class="price">${eur(m)}<span class="per">pro Monat · jährlich</span></div>`;
+    }
+    return `<div class="price">${eur(p.baseMonthly)}<span class="per">pro Monat</span></div>`;
+  }
+
+  function planCardHTML(p, recKey) {
+    const isRec = p.key === recKey;
+    const sel = state.plan === p.key ? " sel" : "";
+    const bullets = p.bullets.map((b) => `<li><span class="t">✓</span><span>${b}</span></li>`).join("");
+    return `<button class="plan${sel}" data-plan="${p.key}" aria-pressed="${state.plan === p.key}">
+              ${isRec ? `<span class="rec">★ Empfohlen</span>` : ""}
+              <span class="pick">${state.plan === p.key ? "✓" : ""}</span>
+              <div class="pname">${p.name}</div>
+              ${priceBlock(p)}
+              <span class="fee">${p.feePct} pro Transaktion</span>
+              <ul>${bullets}</ul>
+            </button>`;
+  }
+
+  function renderPlan() {
+    const recKey = recommend();
+    if (!state.plan) state.plan = recKey;
+    const recPlan = PLANS[recKey];
+
+    card.innerHTML = `
+      ${header("tarif")}
+      <div class="plan-head anim">
+        <p class="eyebrow">Fast geschafft</p>
+        <h2>Wähle deinen Tarif für die Kartenzahlung</h2>
+        <p class="lead">Wir haben dir den passenden Tarif schon vorausgewählt. Wechsle jederzeit – dann nur noch bestätigen.</p>
+        <div class="toggle" role="group" aria-label="Abrechnung">
+          <button data-bill="monthly" class="${state.billing === "monthly" ? "on" : ""}">Monatlich</button>
+          <button data-bill="yearly" class="${state.billing === "yearly" ? "on" : ""}">Jährlich</button>
+        </div>
+        <p class="save-note">Bei jährlicher Zahlung bis zu <b>8 %</b> sparen</p>
+      </div>
+      <div class="plans">
+        ${planCardHTML(PLANS.flat, recKey)}
+        ${planCardHTML(PLANS.payperuse, recKey)}
+      </div>
+      <div class="why anim">
+        <span class="ic">💡</span>
+        <div>Auf Basis deiner Angaben empfehlen wir dir <b>${recPlan.name}</b> – ${recKey === "flat" ? "bei regelmäßigen Kartenzahlungen ist die niedrigere Transaktionsgebühr günstiger." : "bei eher wenigen Kartenzahlungen zahlst du ohne monatliche Grundgebühr am wenigsten."}</div>
+      </div>
+      <div class="plan-actions">
+        <button class="cta" id="confirm">${PLANS[state.plan].name} auswählen & mit Mollie verbinden</button>
+        <button class="back" id="back" style="margin:0 auto">← Zurück</button>
+      </div>`;
+
+    card.querySelectorAll(".toggle button").forEach((b) =>
+      b.addEventListener("click", () => { state.billing = b.dataset.bill; renderPlan(); }));
+    card.querySelectorAll(".plan").forEach((b) =>
+      b.addEventListener("click", () => { state.plan = b.dataset.plan; renderPlan(); }));
+    card.querySelector("#back").addEventListener("click", () => goBack("tarif"));
+    card.querySelector("#confirm").addEventListener("click", finish);
+  }
+
+  function osLabel(os) { return os === "apple" ? "Apple (iPhone / iPad)" : os === "android" ? "Android" : ""; }
+  function readerLabel(a) {
+    const os = osLabel(a.os);
+    if (a.karte === "self") return { ic: "📲", v: `Dieses Gerät · Tap to Pay${os ? ` (${os})` : ""}` };
+    if (a.karte === "phone") return { ic: "📱", v: `Separates Smartphone${os ? ` (${os})` : ""}` };
+    if (a.karte === "terminal") return { ic: "💳", v: "Kartenterminal" };
+    return null;
+  }
+
+  function finish() {
+    const p = PLANS[state.plan];
+    const a = state.answers;
+    const firma = (a.firmenname || "dein Unternehmen").trim();
+    const owner = [a.vorname, a.nachname].filter(Boolean).join(" ").trim() || "—";
+    const reader = readerLabel(a);
+    const base = !p.hasBase ? "Keine Grundgebühr"
+      : state.billing === "yearly" ? `${eur(p.baseMonthly * (1 - YEARLY_DISCOUNT))} / Monat (jährlich)`
+      : `${eur(p.baseMonthly)} / Monat`;
+
+    card.innerHTML = `
+      <div class="result">
+        <div class="band anim">
+          <span class="badge">✓ Auswahl bestätigt</span>
+          <h2 class="sol">${p.name} – fast geschafft!</h2>
+          <p class="sol-sub">Wir verbinden <strong>${firma}</strong> jetzt mit Mollie und richten alles für die Kartenzahlung ein.</p>
+        </div>
+        <div class="setup">
+          <h3>Dein gewählter Tarif</h3>
+          <div class="row"><span class="ic">🏷️</span><div><div class="k">Tarif</div><div class="v">${p.name}</div></div></div>
+          <div class="row"><span class="ic">📅</span><div><div class="k">Grundgebühr</div><div class="v">${base}</div></div></div>
+          <div class="row"><span class="ic">💳</span><div><div class="k">Transaktionsgebühr</div><div class="v">${p.feePct} pro Transaktion</div></div></div>
+          ${reader ? `<div class="row"><span class="ic">${reader.ic}</span><div><div class="k">Kartenlesegerät</div><div class="v">${reader.v}</div></div></div>` : ""}
+          <div class="row"><span class="ic">🏢</span><div><div class="k">Unternehmen</div><div class="v">${firma}</div></div></div>
+          <div class="row"><span class="ic">👤</span><div><div class="k">Eigentümer:in</div><div class="v">${owner}</div></div></div>
+        </div>
+        <div class="actions">
+          <button class="cta" id="connect">Jetzt mit Mollie verbinden</button>
+          <button class="back" id="again" style="margin:0 auto">↺ Nochmal von vorn</button>
+        </div>
+      </div>`;
+    card.querySelector("#again").addEventListener("click", () => { resetState(); renderIntro(); });
+    const c = card.querySelector("#connect");
+    c.addEventListener("click", renderPairing);
+    c.focus();
+  }
+
+  // ---- QR code (representative visual, derived deterministically from the code) ----
+  function drawQR(canvas, text) {
+    const N = 29, quiet = 2, scale = 7, total = N + quiet * 2, px = total * scale;
+    canvas.width = px; canvas.height = px;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, px, px);
+
+    const m = Array.from({ length: N }, () => new Array(N).fill(false));
+    const res = Array.from({ length: N }, () => new Array(N).fill(false));
+
+    const finder = (r, c) => {
+      for (let i = -1; i <= 7; i++) for (let j = -1; j <= 7; j++) {
+        const rr = r + i, cc = c + j;
+        if (rr < 0 || cc < 0 || rr >= N || cc >= N) continue;
+        res[rr][cc] = true;
+        if (i < 0 || i > 6 || j < 0 || j > 6) { m[rr][cc] = false; continue; }
+        const border = i === 0 || i === 6 || j === 0 || j === 6;
+        const center = i >= 2 && i <= 4 && j >= 2 && j <= 4;
+        m[rr][cc] = border || center;
+      }
+    };
+    finder(0, 0); finder(0, N - 7); finder(N - 7, 0);
+
+    for (let i = 8; i < N - 8; i++) { m[6][i] = i % 2 === 0; res[6][i] = true; m[i][6] = i % 2 === 0; res[i][6] = true; }
+
+    const align = (cr, cc) => {
+      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+        const rr = cr + i, cc2 = cc + j; res[rr][cc2] = true;
+        m[rr][cc2] = Math.max(Math.abs(i), Math.abs(j)) === 2 || (i === 0 && j === 0);
+      }
+    };
+    align(N - 7, N - 7);
+
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+    const rnd = () => { h = (h + 0x6D2B79F5) | 0; let t = Math.imul(h ^ (h >>> 15), 1 | h); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (!res[r][c]) m[r][c] = rnd() < 0.48;
+
+    ctx.fillStyle = "#141413";
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
+      if (m[r][c]) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+  }
+
+  function wireCopy(code) {
+    const btn = card.querySelector("#copy");
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(code); } catch (e) { /* clipboard not available in sandbox */ }
+      btn.textContent = "✓"; btn.classList.add("done");
+      setTimeout(() => { btn.textContent = "⧉"; btn.classList.remove("done"); }, 1600);
+    });
+  }
+
+  function renderPairing() {
+    const a = state.answers;
+    const code = "BrkSDMtWsDyWyETSRxWs";
+    const sameDevice = a.karte === "self";
+    const isTerminal = a.karte === "terminal";
+    const scanTarget = isTerminal ? "deinem Mollie-Terminal" : "deinem zweiten Smartphone in der Mollie-App";
+
+    const pairCode = `
+      <div class="pcode">
+        <div class="lbl">Pairing-Code</div>
+        <div class="row2"><code>${code}</code><button class="copybtn" id="copy" title="Code kopieren">⧉</button></div>
+      </div>`;
+
+    let body;
+    if (sameDevice) {
+      const appName = a.os === "apple" ? "Mollie-Tap-App (App Store)" : "Mollie-Tap-App (Play Store)";
+      body = `
+        <div class="callout info">
+          <h4>Einrichtung auf diesem Gerät</h4>
+          <p>Du nutzt dieses Gerät selbst als Kartenleser (Tap to Pay). Den QR-Code kannst du mit demselben Gerät nicht scannen – tippe stattdessen auf <b>Jetzt konfigurieren</b> oder kopiere den Pairing-Code manuell in die Mollie-Tap-App.</p>
+        </div>
+        <div class="callout ok">
+          Nach erfolgreichem Koppeln wird die Zahlungsmethode „Bankomat" automatisch für dieses Gerät konfiguriert und kann sofort verwendet werden.
+        </div>
+        ${pairCode}
+        <button class="cta" id="configure" style="margin-top:18px">📲 Jetzt konfigurieren</button>
+        <div class="hint-c">Öffnet die ${appName}.</div>
+        <div class="waiting"><span class="spinner"></span> Warte auf Verbindung…</div>`;
+    } else {
+      body = `
+        <div class="callout info">
+          <h4>${isTerminal ? "Externes Terminal koppeln" : "Separates Smartphone koppeln"}</h4>
+          <p>Scanne den QR-Code mit ${scanTarget}. Alternativ kannst du den Pairing-Code manuell ${isTerminal ? "am Terminal" : "in der App"} eingeben.</p>
+        </div>
+        <div class="callout ok">
+          Nach erfolgreichem Koppeln wird die Zahlungsmethode „Bankomat" automatisch für dieses ${isTerminal ? "Terminal" : "Gerät"} konfiguriert und kann sofort verwendet werden.
+        </div>
+        <div class="qrbox"><canvas id="qr"></canvas></div>
+        ${pairCode}
+        <div class="waiting"><span class="spinner"></span> Warte auf Verbindung…</div>
+        <button class="cta" id="simulate" style="margin-top:20px">▶ Kopplung simulieren (Demo)</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="bar"><div class="brand">hello<span>Cash</span></div><div class="count">${sameDevice ? "Gerät einrichten" : "Gerät koppeln"}</div></div>
+      <div class="sheet anim">
+        ${body}
+        <div class="nav" style="margin-top:22px">
+          <button class="back" id="back">← Zurück</button>
+          <button class="back" id="close" style="margin-left:auto">Schließen</button>
+        </div>
+      </div>`;
+
+    if (!sameDevice) drawQR(card.querySelector("#qr"), code);
+    wireCopy(code);
+
+    const cfg = card.querySelector("#configure");
+    if (cfg) cfg.addEventListener("click", renderTapApp);
+    const sim = card.querySelector("#simulate");
+    if (sim) sim.addEventListener("click", renderCoupled);
+    card.querySelector("#back").addEventListener("click", finish);
+    card.querySelector("#close").addEventListener("click", closeSurvey);
+  }
+
+  // ---- small shared graphics ----
+  function locArrow() { return `<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M2 11.5 22 3l-8 19-2.5-8.5z"/></svg>`; }
+  function sysIcons() {
+    return `<span style="display:inline-flex;align-items:center;gap:6px">
+      <svg width="19" height="13" viewBox="0 0 19 13" fill="#fff"><rect x="0" y="9" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="7" rx="1"/><rect x="10" y="3" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="13" rx="1"/></svg>
+      <svg width="17" height="13" viewBox="0 0 17 13" fill="#fff"><path d="M8.5 2.6c2.2 0 4.2.9 5.7 2.3l1.3-1.4A10 10 0 0 0 8.5.8 10 10 0 0 0 1 3.5l1.3 1.4A8 8 0 0 1 8.5 2.6z"/><path d="M8.5 6.3c1.2 0 2.3.5 3.1 1.3l1.3-1.4A6 6 0 0 0 8.5 4.4a6 6 0 0 0-4.4 1.8l1.3 1.4A4.3 4.3 0 0 1 8.5 6.3z"/><path d="m8.5 10.4 2-2a3 3 0 0 0-4 0z"/></svg>
+      <span style="font-size:13px;font-weight:700;margin-left:2px">92</span>
+      <svg width="26" height="13" viewBox="0 0 26 13"><rect x="0.6" y="0.6" width="21.5" height="11.8" rx="3" fill="none" stroke="#fff" stroke-width="1.2"/><rect x="2.2" y="2.2" width="16" height="8.6" rx="1.4" fill="#fff"/><rect x="23.6" y="4.2" width="1.7" height="4.6" rx="0.8" fill="#fff"/></svg>
+    </span>`;
+  }
+  function statusBar() { return `<div class="status"><span class="time">10:04 ${locArrow()}</span>${sysIcons()}</div>`; }
+  function mollieLogo() { return `<div class="mlogo"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 2.5c-3.6 0-6.5 2.9-6.5 6.5 0 4.6 6.5 12.5 6.5 12.5s6.5-7.9 6.5-12.5c0-3.6-2.9-6.5-6.5-6.5z" fill="#fff"/><circle cx="12" cy="9" r="2.5" fill="#2f93c9"/></svg></div>`; }
+  function nfcGlyph() { return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#cfd3d8" stroke-width="2" stroke-linecap="round"><path d="M9 7a7 7 0 0 1 0 10"/><path d="M13.5 4a12 12 0 0 1 0 16"/></svg>`; }
+  function cardDecor() {
+    return `<span class="chip"></span>
+      <span class="cwave"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M9 7a7 7 0 0 1 0 10"/><path d="M13.5 4a12 12 0 0 1 0 16"/></svg></span>
+      <span class="cnum">•••• 4821</span><span class="cname">M. MUSTERMANN</span>`;
+  }
+
+  function hcMark() {
+    return `<svg width="30" height="30" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14.5" stroke="#fff" stroke-width="2"/><path d="M16 8.5c-3 0-5.5 2.4-5.5 5.5 0 3.8 5.5 9.5 5.5 9.5s5.5-5.7 5.5-9.5c0-3.1-2.5-5.5-5.5-5.5z" fill="#fff"/><circle cx="16" cy="13.8" r="2.2" fill="#3a9bd0"/></svg>`;
+  }
+  function terminalViz() {
+    return `<div class="termviz">
+      <div class="termphone">
+        <div class="term-top">${mollieLogo()}</div>
+        <div class="term-amt">€32,50</div>
+        <div class="term-desc">+ Beschreibung hinzufügen</div>
+        <div class="term-pad">${Array.from({ length: 9 }, (_, i) => `<span>${i + 1}</span>`).join("")}<span>00</span><span>0</span><span>⌫</span></div>
+      </div>
+    </div>`;
+  }
+
+  // ---- Mollie Tap app: pairing ----
+  function renderTapApp() {
+    const code = "BrkSDMtWsDyWyETSRxWs";
+    const acct = ((state.answers.firmenname || "Demo").trim()) + "_DemoAccount";
+    card.innerHTML = `
+      <div class="phone anim">
+        ${statusBar()}
+        <div class="app">
+          <div class="apphead">
+            <button class="nav-back" id="tback" aria-label="Zurück">‹</button>
+            ${mollieLogo()}
+            <div class="acct">${acct}</div>
+          </div>
+          <div class="tap-title">Terminal koppeln</div>
+          <p class="tap-sub">Füge den Pairing-Code ein und tippe auf „Terminal koppeln", um dieses Gerät als Kartenleser zu verbinden.</p>
+          <div class="tap-field">
+            <label>Pairing-Code</label>
+            <input id="token" value="${code}" spellcheck="false" autocomplete="off">
+          </div>
+          <button class="tap-btn" id="couple">Terminal koppeln</button>
+        </div>
+      </div>`;
+    card.querySelector("#tback").addEventListener("click", renderPairing);
+    card.querySelector("#couple").addEventListener("click", renderCoupled);
+  }
+
+  // ---- helloCash: terminal coupled + first payment prompt ----
+  function renderCoupled() {
+    card.innerHTML = `
+      <div class="result">
+        <div class="band anim" style="background:var(--save)">
+          <span class="badge">✓ Verbunden</span>
+          <h2 class="sol">Terminal erfolgreich gekoppelt</h2>
+          <p class="sol-sub">Dein Kartenlesegerät ist jetzt mit helloCash verbunden und die Zahlungsmethode „Bankomat" ist aktiv.</p>
+        </div>
+        <div class="setup">
+          <div class="row"><span class="ic" style="color:var(--save)">✓</span><div><div class="k">Status</div><div class="v">Bereit für Kartenzahlungen</div></div></div>
+        </div>
+        <div class="callout info" style="margin:18px 24px 0">
+          <h4>Letzter Schritt</h4>
+          <p>Schließe dein Onboarding mit deiner ersten Zahlung ab – so siehst du sofort, dass alles funktioniert.</p>
+        </div>
+        <div class="actions">
+          <button class="cta" id="firstpay">Erste Zahlung starten</button>
+          <button class="back" id="again" style="margin:0 auto">↺ Nochmal von vorn</button>
+        </div>
+      </div>`;
+    card.querySelector("#firstpay").addEventListener("click", renderPaymentPad);
+    card.querySelector("#again").addEventListener("click", () => { resetState(); renderIntro(); });
+  }
+
+  // ---- Mollie Tap app: amount entry ----
+  function renderPaymentPad() {
+    const acct = ((state.answers.firmenname || "Demo").trim()) + "_DemoAccount";
+    let cents = 0;
+    const fmt = (c) => "€" + (c / 100).toFixed(2).replace(".", ",");
+    const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button class="key" data-d="${n}">${n}</button>`).join("");
+    card.innerHTML = `
+      <div class="phone anim">
+        ${statusBar()}
+        <div class="app">
+          <div class="apphead">
+            <button class="nav-back" id="pback" aria-label="Zurück">‹</button>
+            ${mollieLogo()}
+            <div class="acct">${acct}</div>
+          </div>
+          <div class="amount" id="amt">€0,00</div>
+          <button class="desc-pill"><span>+</span> Beschreibung</button>
+          <div class="pad">
+            ${keys}
+            <button class="key" data-d="00">00</button>
+            <button class="key" data-d="0">0</button>
+            <button class="key del" data-del="1" aria-label="Löschen">⌫</button>
+          </div>
+          <button class="pay-btn" id="pay">Bezahlen</button>
+        </div>
+      </div>`;
+    const amtEl = card.querySelector("#amt");
+    const payBtn = card.querySelector("#pay");
+    const update = () => { amtEl.textContent = fmt(cents); payBtn.classList.toggle("on", cents > 0); };
+    card.querySelectorAll(".key[data-d]").forEach((k) => k.addEventListener("click", () => {
+      const d = k.dataset.d;
+      cents = d === "00" ? Math.min(cents * 100, 9999999) : Math.min(cents * 10 + parseInt(d, 10), 9999999);
+      update();
+    }));
+    card.querySelector(".key[data-del]").addEventListener("click", () => { cents = Math.floor(cents / 10); update(); });
+    payBtn.addEventListener("click", () => { if (cents > 0) renderCardHold(cents); });
+    card.querySelector("#pback").addEventListener("click", renderCoupled);
+  }
+
+  // ---- helloCash: card-hold animation (Kartenzahlung) ----
+  function renderCardHold(cents) {
+    const amt = "€ " + (cents / 100).toFixed(2).replace(".", ",");
+    card.innerHTML = `
+      <div class="kz anim">
+        <div class="kz-head">Kartenzahlung</div>
+        <div class="kz-body">
+          <div class="payviz">
+            <div class="viz-card">${cardDecor()}</div>
+            <div class="viz-phone">
+              <div class="viz-ring"><span class="nfc"></span><span class="nfc"></span><span class="nfc"></span>${nfcGlyph()}</div>
+              <div class="viz-amt">${amt}</div>
+              <div class="viz-ready">Bereit zum Zahlen</div>
+            </div>
+          </div>
+          <div class="kz-amt">${amt}</div>
+          <div class="kz-line"><span class="dots"><i></i><i class="on"></i><i></i></span><span class="kz-status" id="kzst">Bereite Zahlung vor …</span></div>
+          <div class="actions" style="padding:22px 0 0"><button class="back" id="kzcancel" style="margin:0 auto">Abbrechen</button></div>
+        </div>
+      </div>`;
+    card.querySelector("#kzcancel").addEventListener("click", renderPaymentPad);
+    setTimeout(() => { const s = card.querySelector("#kzst"); if (s) s.textContent = "Karte oder Handy an das Terminal halten"; }, 1500);
+    setTimeout(() => showPaid(cents), 4200);
+  }
+
+  function showPaid(cents) {
+    if (!card.querySelector(".kz")) return; // navigated away
+    const amt = "€ " + (cents / 100).toFixed(2).replace(".", ",");
+    card.innerHTML = `
+      <div class="kz anim">
+        <div class="kz-head">Kartenzahlung</div>
+        <div class="kz-body">
+          <div class="kz-done">✓</div>
+          <div class="kz-amt" style="margin-top:4px">${amt} bezahlt</div>
+          <p style="font-size:14px;color:var(--body);margin:6px 0 0">Zahlung erfolgreich abgeschlossen.</p>
+          <div class="actions" style="padding:24px 0 0"><button class="cta" id="done">Onboarding abschließen</button></div>
+        </div>
+      </div>`;
+    card.querySelector("#done").addEventListener("click", renderDone);
+  }
+
+  function renderDone() {
+    card.innerHTML = `
+      <div class="result">
+        <div class="band anim" style="background:var(--save)">
+          <span class="badge">🎉 Fertig</span>
+          <h2 class="sol">Onboarding abgeschlossen!</h2>
+          <p class="sol-sub">Tarif gewählt, Kartenlesegerät gekoppelt und die erste Zahlung lief durch. Du kannst jetzt loslegen.</p>
+        </div>
+        <div class="actions">
+          <button class="cta" id="restart">↺ Demo von vorn starten</button>
+          <button class="back" id="boclose" style="margin:0 auto">Schließen</button>
+        </div>
+      </div>`;
+    card.querySelector("#restart").addEventListener("click", renderLanding);
+    card.querySelector("#boclose").addEventListener("click", closeSurvey);
+  }
+
+  // ---- Entry point: landing / registration ----
+  function renderLanding() {
+    const email = PREFILL ? "maria@muster-friseur.at" : "";
+    root.innerHTML = `
+      <div class="landing">
+        <div class="hc-logo">${hcMark()}<span>hello<b>Cash</b></span></div>
+        <div class="landing-wrap">
+          <div class="landing-hero">
+            <h1>Die smarte Zahlungslösung für dein Business</h1>
+            <p>Erleichtere deinen Geschäftsalltag mit helloCash – einfach, effizient und rechtskonform.</p>
+            <div class="stars">★★★★★</div>
+            <p class="rated">Bewertet mit 4,8/5 von über 1.000 Kunden</p>
+          </div>
+          <div class="signup">
+            <h2>Kartenzahlung erhalten</h2>
+            <p>Überzeug dich selbst, wie helloCash dein Unternehmen voranbringen kann.</p>
+            <label class="su-label" for="email">Email*</label>
+            <input id="email" type="email" value="${email}" placeholder="name@firma.at">
+            <button class="su-btn" id="signup">Jetzt Starten!</button>
+            <p class="su-fine">Durch die Nutzung von helloCash akzeptierst du die <a href="#" onclick="return false">AGB</a> und den <a href="#" onclick="return false">Datenschutz</a>.</p>
+          </div>
+        </div>
+      </div>`;
+    const submit = () => renderBackoffice();
+    root.querySelector("#signup").addEventListener("click", submit);
+    root.querySelector("#email").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  }
+
+  // ---- helloCash backoffice: Kartenzahlung page (survey auto-starts over it) ----
+  function renderBackoffice() {
+    root.innerHTML = `
+      <div class="bo">
+        <aside class="bo-side">
+          <div class="bo-company"><div class="bo-cn">Dein Firmenname</div><div class="bo-cl">1010 Wien ▾</div></div>
+          <nav class="bo-nav">
+            <a class="bo-item active">💳 Kartenzahlung <span class="bo-new">neu</span></a>
+            <a class="bo-item">👤 Mein Konto</a>
+            <a class="bo-item">？ Hilfe</a>
+          </nav>
+        </aside>
+        <main class="bo-main">
+          <header class="bo-top">
+            <span class="bo-burger">☰</span>
+            <span class="bo-search">🔍 Suchbegriff …</span>
+            <span class="bo-top-r">
+              <span class="bo-products">▦ Produkte</span>
+              <span>AT ▾</span><span>Kunden Nr.: <b>15000181</b></span><span>⤴ Log out</span>
+            </span>
+          </header>
+          <div class="bo-content">
+            <h1 class="bo-h1">Kartenzahlung</h1>
+            <div class="bo-hero">
+              <div class="bo-hero-txt">
+                <span class="bo-badge">▤ AB 0,89% TRANSAKTIONSGEBÜHR</span>
+                <h2>Kartenzahlung mit Mollie</h2>
+                <p>Akzeptiere Kartenzahlungen direkt über helloCash — einfach, sicher und ohne monatliche Grundgebühren.</p>
+                <div class="bo-offer"><span class="bo-offer-k">% EINFÜHRUNGSANGEBOT</span><b>Ab 0,89% Transaktionsgebühr</b></div>
+                <ul class="bo-list">
+                  <li>✅ Keine monatlichen Grundgebühren</li>
+                  <li>✅ Alle gängigen Karten akzeptiert (Visa, Mastercard, Maestro u.v.m.)</li>
+                  <li>✅ Echtzeit-Zahlungsübersicht in helloCash</li>
+                  <li>✅ Terminal in wenigen Minuten eingerichtet</li>
+                </ul>
+                <div class="bo-cta">
+                  <button class="bo-btn-primary" id="bo-create">+ Neues Mollie Konto erstellen</button>
+                  <button class="bo-btn-ghost" id="bo-link">🔗 Bestehendes Mollie-Konto verknüpfen</button>
+                </div>
+              </div>
+              <div class="bo-hero-viz">${terminalViz()}</div>
+            </div>
+            <div class="bo-features">
+              <div class="bo-feat"><div class="bo-feat-ic">💳</div><b>Alle gängigen Karten</b><p>Akzeptiere Visa, Mastercard, Maestro und viele weitere Karten.</p></div>
+              <div class="bo-feat"><div class="bo-feat-ic">🛡️</div><b>Sicher &amp; zertifiziert</b><p>PCI-DSS konform. Deine Zahlungsdaten sind bestens geschützt.</p></div>
+              <div class="bo-feat"><div class="bo-feat-ic">⚡</div><b>Sofort einsatzbereit</b><p>Kopple dein Terminal in wenigen Minuten und starte direkt.</p></div>
+            </div>
+          </div>
+        </main>
+      </div>`;
+    root.querySelector("#bo-create").addEventListener("click", openSurvey);
+    root.querySelector("#bo-link").addEventListener("click", openSurvey);
+    openSurvey(); // survey starts automatically
+  }
+
+  function openSurvey() {
+    let modal = document.getElementById("survey-modal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "survey-modal";
+      modal.className = "modal";
+      modal.innerHTML = `<div class="modal-backdrop"></div><div class="modal-card card" id="card"></div><button class="modal-x" id="modal-x" aria-label="Schließen">×</button>`;
+      root.appendChild(modal);
+      modal.querySelector("#modal-x").addEventListener("click", closeSurvey);
+    }
+    card = document.getElementById("card");
+    resetState();
+    renderIntro();
+  }
+
+  function closeSurvey() {
+    const m = document.getElementById("survey-modal");
+    if (m) m.remove();
+  }
+
+  renderLanding();
+</script>
+
+</body>
+
+</html>
