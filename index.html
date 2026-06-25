@@ -94,7 +94,7 @@
     appearance: none; text-align: left; font-family: var(--font);
     background: #fbfcfd; border: 1.5px solid var(--line); border-radius: 13px;
     padding: 16px; cursor: pointer; display: flex; align-items: center; gap: 13px;
-    color: var(--text); transition: border-color .15s, background .15s, transform .08s;
+    color: var(--text); text-decoration: none; transition: border-color .15s, background .15s, transform .08s;
   }
   .opt:hover { border-color: var(--line-strong); background: #fff; }
   .opt:active { transform: scale(.985); }
@@ -506,7 +506,7 @@
       cols: 1,
       options: [
         { emoji: "✅", lbl: "Ich habe bereits ein Mollie Terminal", val: "have" },
-        { emoji: "🛒", lbl: "Ich brauche ein Mollie Terminal", sub: "Hier geht's zum Shop →", val: "need" },
+        { emoji: "🛒", lbl: "Ich brauche ein Mollie Terminal", sub: "Hier geht's zum Shop →", val: "need", href: "https://myhelloshop.com/de/article/hellocash-zahlungsterminal/552" },
       ],
     },
     {
@@ -703,10 +703,12 @@
     const opts = list.map((o, idx) => {
       const sel = chosen === o.val ? " sel" : "";
       const sub = o.sub ? `<span class="sub">${o.sub}</span>` : "";
-      return `<button class="opt${sel}" data-val="${o.val}" style="animation-delay:${idx * 45}ms">
-                <span class="emoji">${o.emoji}</span>
-                <span class="lbl">${o.lbl}${sub}</span>
-              </button>`;
+      const inner = `<span class="emoji">${o.emoji}</span><span class="lbl">${o.lbl}${sub}</span>`;
+      const style = `style="animation-delay:${idx * 45}ms"`;
+      if (o.href) {
+        return `<a class="opt${sel}" data-val="${o.val}" href="${o.href}" target="_blank" rel="noopener" ${style}>${inner}</a>`;
+      }
+      return `<button class="opt${sel}" data-val="${o.val}" ${style}>${inner}</button>`;
     }).join("");
     const moreBtn = S.more && !expanded
       ? `<button class="more-btn" id="more">${S.moreLabel || "Weitere anzeigen"}</button>` : "";
@@ -1021,7 +1023,7 @@
         <div class="qrbox"><canvas id="qr"></canvas></div>
         ${pairCode}
         <div class="waiting"><span class="spinner"></span> Warte auf Verbindung…</div>
-        <button class="cta" id="simulate" style="margin-top:20px">▶ Kopplung simulieren (Demo)</button>`;
+        <button class="cta" id="simulate" style="margin-top:20px">QR-Code scannen</button>`;
     }
 
     card.innerHTML = `
