@@ -104,6 +104,14 @@
   .opt .lbl { font-size: 15.5px; font-weight: 700; line-height: 1.25; }
   .opt .sub { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
 
+  .more-btn {
+    margin-top: 12px; width: 100%; appearance: none; font-family: var(--font);
+    font-size: 14px; font-weight: 700; color: var(--accent-deep); background: #fff;
+    border: 1.5px dashed var(--line-strong); border-radius: 13px; padding: 14px; cursor: pointer; transition: .15s;
+  }
+  .more-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .more-btn:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 1px; }
+
   /* ---- form fields ---- */
   .fields { display: flex; flex-wrap: wrap; gap: 14px; }
   .field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 100%; min-width: 0; }
@@ -440,6 +448,19 @@
         { emoji: "🛍️", lbl: "Laden / Verkauf", val: "laden" },
         { emoji: "🛠️", lbl: "Dienstleistung", val: "dienst" },
       ],
+      moreLabel: "Nicht dabei? Weitere Branchen anzeigen",
+      more: [
+        { emoji: "🩺", lbl: "Gesundheit / Praxis", val: "gesundheit" },
+        { emoji: "🔧", lbl: "Handwerk / Werkstatt", val: "handwerk" },
+        { emoji: "🏋️", lbl: "Fitness / Sport", val: "fitness" },
+        { emoji: "🏨", lbl: "Hotel / Beherbergung", val: "hotel" },
+        { emoji: "🥐", lbl: "Bäckerei / Lebensmittel", val: "lebensmittel" },
+        { emoji: "🐾", lbl: "Tierbedarf / Tierarzt", val: "tier" },
+        { emoji: "🎓", lbl: "Bildung / Kurse", val: "bildung" },
+        { emoji: "🌐", lbl: "Online-Shop", val: "onlineshop" },
+        { emoji: "🎟️", lbl: "Events / Veranstaltung", val: "events" },
+        { emoji: "🚕", lbl: "Transport / Mobilität", val: "transport" },
+      ],
     },
     {
       id: "volumen", section: "unternehmen", type: "choice",
@@ -447,9 +468,9 @@
       sub: "Daraus schlagen wir dir am Ende den passenden Tarif vor.",
       cols: 1,
       options: [
-        { emoji: "🪙", lbl: "Eher selten", sub: "ein paar Kartenzahlungen pro Woche", val: "selten" },
-        { emoji: "💳", lbl: "Regelmäßig", sub: "täglich ein paar Karten dabei", val: "regelmaessig" },
         { emoji: "🔁", lbl: "Sehr oft", sub: "Karte ist bei mir die Hauptzahlart", val: "oft" },
+        { emoji: "💳", lbl: "Regelmäßig", sub: "täglich ein paar Karten dabei", val: "regelmaessig" },
+        { emoji: "🪙", lbl: "Eher selten", sub: "ein paar Kartenzahlungen pro Woche", val: "selten" },
       ],
     },
     {
@@ -458,7 +479,7 @@
       sub: "Das entscheidet, wie wir dein Kartenlesegerät später koppeln.",
       cols: 1,
       options: [
-        { emoji: "📲", lbl: "Mit genau diesem Gerät", sub: "Tap to Pay – dein Smartphone liest die Karte selbst", val: "self" },
+        { emoji: "📲", lbl: "Mit genau diesem Gerät", sub: "Tap on phone – dein Smartphone liest die Karte selbst", val: "self" },
         { emoji: "📱", lbl: "Mit einem separaten Smartphone", sub: "ein zweites Handy als Kartenleser", val: "phone" },
         { emoji: "💳", lbl: "Mit einem Kartenterminal", sub: "ein eigenes Gerät zum Draufhalten oder Stecken", val: "terminal" },
       ],
@@ -472,6 +493,17 @@
       options: [
         { emoji: "🍏", lbl: "Apple (iPhone / iPad)", val: "apple" },
         { emoji: "🤖", lbl: "Android", val: "android" },
+      ],
+    },
+    {
+      id: "terminal_status", section: "unternehmen", type: "choice",
+      cond: (a) => a.karte === "terminal",
+      eyebrow: "Über dein Geschäft", q: "Hast du schon ein Mollie-Terminal?",
+      sub: "Du brauchst ein Mollie-Terminal, um Karten direkt einzulesen.",
+      cols: 1,
+      options: [
+        { emoji: "✅", lbl: "Ich habe bereits ein Mollie Terminal", val: "have" },
+        { emoji: "🛒", lbl: "Ich brauche ein Mollie Terminal", sub: "Hier geht's zum Shop →", val: "need" },
       ],
     },
     {
@@ -568,7 +600,7 @@
   // Test prefill so the flow can be clicked through quickly. Set PREFILL = false to start empty.
   const PREFILL = true;
   const TEST_DATA = {
-    branche: "friseur", volumen: "oft", karte: "self", os: "apple",
+    branche: "friseur", volumen: "oft", karte: "self", os: "apple", terminal_status: "have",
     firmenname: "Muster Friseur GmbH", rechtsform: "GmbH",
     strasse: "Musterstraße", hausnummer: "12", plz: "1010", stadt: "Wien",
     telefon: "+43 1 2345678", webseite: "https://muster-friseur.at",
@@ -581,8 +613,8 @@
   };
   const freshAnswers = () => (PREFILL ? { ...TEST_DATA } : {});
 
-  const state = { answers: freshAnswers(), plan: null, billing: "monthly" };
-  function resetState() { state.answers = freshAnswers(); state.plan = null; state.billing = "monthly"; }
+  const state = { answers: freshAnswers(), plan: null, billing: "monthly", expanded: null };
+  function resetState() { state.answers = freshAnswers(); state.plan = null; state.billing = "monthly"; state.expanded = null; }
   const root = document.getElementById("root");
   let card = null; // assigned when the survey modal mounts
 
@@ -662,7 +694,9 @@
 
   function renderChoice(S) {
     const chosen = state.answers[S.id];
-    const opts = S.options.map((o, idx) => {
+    const expanded = state.expanded === S.id;
+    const list = expanded && S.more ? S.options.concat(S.more) : S.options;
+    const opts = list.map((o, idx) => {
       const sel = chosen === o.val ? " sel" : "";
       const sub = o.sub ? `<span class="sub">${o.sub}</span>` : "";
       return `<button class="opt${sel}" data-val="${o.val}" style="animation-delay:${idx * 45}ms">
@@ -670,6 +704,8 @@
                 <span class="lbl">${o.lbl}${sub}</span>
               </button>`;
     }).join("");
+    const moreBtn = S.more && !expanded
+      ? `<button class="more-btn" id="more">${S.moreLabel || "Weitere anzeigen"}</button>` : "";
 
     card.innerHTML = `
       ${header(S.id)}
@@ -677,12 +713,15 @@
         <p class="eyebrow">${S.eyebrow}</p>
         <h2 class="q">${S.q}${S.sub ? `<small>${S.sub}</small>` : ""}</h2>
         <div class="options ${S.cols === 1 ? "col" : ""}">${opts}</div>
+        ${moreBtn}
         <div class="nav"><button class="back">← Zurück</button></div>
       </div>`;
 
     card.querySelectorAll(".opt").forEach((b) => {
       b.addEventListener("click", () => { state.answers[S.id] = b.dataset.val; advance(S.id); });
     });
+    const mb = card.querySelector("#more");
+    if (mb) mb.addEventListener("click", () => { state.expanded = S.id; renderChoice(S); });
     card.querySelector(".back").addEventListener("click", () => goBack(S.id));
   }
 
@@ -837,7 +876,7 @@
   function osLabel(os) { return os === "apple" ? "Apple (iPhone / iPad)" : os === "android" ? "Android" : ""; }
   function readerLabel(a) {
     const os = osLabel(a.os);
-    if (a.karte === "self") return { ic: "📲", v: `Dieses Gerät · Tap to Pay${os ? ` (${os})` : ""}` };
+    if (a.karte === "self") return { ic: "📲", v: `Dieses Gerät · Tap on phone${os ? ` (${os})` : ""}` };
     if (a.karte === "phone") return { ic: "📱", v: `Separates Smartphone${os ? ` (${os})` : ""}` };
     if (a.karte === "terminal") return { ic: "💳", v: "Kartenterminal" };
     return null;
@@ -952,7 +991,7 @@
       body = `
         <div class="callout info">
           <h4>Einrichtung auf diesem Gerät</h4>
-          <p>Du nutzt dieses Gerät selbst als Kartenleser (Tap to Pay). Den QR-Code kannst du mit demselben Gerät nicht scannen – tippe stattdessen auf <b>Jetzt konfigurieren</b> oder kopiere den Pairing-Code manuell in die Mollie-Tap-App.</p>
+          <p>Du nutzt dieses Gerät selbst als Kartenleser (Tap on phone). Den QR-Code kannst du mit demselben Gerät nicht scannen – tippe stattdessen auf <b>Jetzt konfigurieren</b> oder kopiere den Pairing-Code manuell in die Mollie-Tap-App.</p>
         </div>
         <div class="callout ok">
           Nach erfolgreichem Koppeln wird die Zahlungsmethode „Bankomat" automatisch für dieses Gerät konfiguriert und kann sofort verwendet werden.
