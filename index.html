@@ -139,6 +139,7 @@
   }
   .check:hover { border-color: var(--line-strong); background: #fff; }
   .check.on { border-color: var(--accent); background: var(--accent-soft); }
+  .check input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
   .check .box {
     flex: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-strong);
     display: grid; place-items: center; font-size: 13px; color: #fff; background: #fff; transition: .15s; margin-top: 1px;
@@ -544,7 +545,7 @@
     {
       id: "beschreibung", section: "unternehmen", type: "form",
       eyebrow: "Unternehmen", q: "Beschreib dein Unternehmen kurz.",
-      sub: "Mollie braucht das zur Prüfung. Mindestens 50 Zeichen.",
+      sub: "Mindestens 50 Zeichen.",
       fields: [
         { name: "beschreibung", label: "Beschreibung", type: "textarea", placeholder: "Was bietest du an, für wen?", required: true, min: 50, hint: "mindestens 50 Zeichen" },
       ],
@@ -563,10 +564,12 @@
       fields: [
         { name: "geburtsdatum", label: "Geburtsdatum", type: "date", required: true, w: "48%" },
         { name: "geburtsland", label: "Geburtsland", type: "select", required: true, options: LAENDER, placeholder: "Land wählen", w: "48%" },
+        { name: "sameCountry", type: "checkbox", default: true, title: "Geburtsland ist gleich Nationalität und Wohnsitzland", desc: "Entferne das Häkchen, wenn diese abweichen – dann fragen wir sie separat ab." },
       ],
     },
     {
       id: "herkunft", section: "eigentuemer", type: "form",
+      cond: (a) => a.sameCountry === false,
       eyebrow: "Eigentümer", q: "Nationalität und Wohnsitzland?",
       fields: [
         { name: "nationalitaet", label: "Nationalität", type: "select", required: true, options: LAENDER, placeholder: "Land wählen", w: "48%" },
@@ -587,7 +590,7 @@
 
   const PLANS = {
     flat: {
-      key: "flat", name: "Mollie Flat", baseMonthly: 1.90, feePct: "0,89 %", hasBase: true,
+      key: "flat", name: "Mollie Flat", baseMonthly: 1.90, baseYearly: 20.90, feePct: "0,89 %", hasBase: true,
       bullets: ["0,89 % pro Transaktion", "Planbare monatliche Grundgebühr", "Ideal bei vielen Kartenzahlungen"],
     },
     payperuse: {
@@ -595,7 +598,6 @@
       bullets: ["1,29 % pro Transaktion", "Keine monatlichen Grundgebühren", "Ideal bei wenigen Kartenzahlungen"],
     },
   };
-  const YEARLY_DISCOUNT = 0.08;
 
   // Test prefill so the flow can be clicked through quickly. Set PREFILL = false to start empty.
   const PREFILL = true;
@@ -731,9 +733,10 @@
     const wattr = f.w ? `data-w="${f.w}"` : "";
 
     if (f.type === "checkbox") {
-      const on = state.answers[f.name] ? " on" : "";
+      const checked = state.answers[f.name] ?? f.default ?? false;
+      const on = checked ? " on" : "";
       return `<label class="check${on}" data-name="${f.name}" style="animation-delay:${idx * 40}ms">
-                <input type="checkbox" ${state.answers[f.name] ? "checked" : ""}>
+                <input type="checkbox" ${checked ? "checked" : ""}>
                 <span class="box">✓</span>
                 <span class="ctxt"><b>${f.title}</b><span>${f.desc}</span></span>
               </label>`;
@@ -791,7 +794,12 @@
 
     card.querySelector(".back").addEventListener("click", () => goBack(S.id));
     card.querySelector(".next").addEventListener("click", () => {
-      if (validate(S)) advance(S.id);
+      if (!validate(S)) return;
+      if (S.id === "geburt" && state.answers.sameCountry !== false) {
+        state.answers.nationalitaet = state.answers.geburtsland;
+        state.answers.wohnsitzland = state.answers.geburtsland;
+      }
+      advance(S.id);
     });
   }
 
@@ -815,8 +823,7 @@
   function priceBlock(p) {
     if (!p.hasBase) return `<div class="price">Keine<span class="per">Grundgebühr</span></div>`;
     if (state.billing === "yearly") {
-      const m = p.baseMonthly * (1 - YEARLY_DISCOUNT);
-      return `<div class="price">${eur(m)}<span class="per">pro Monat · jährlich</span></div>`;
+      return `<div class="price">${eur(p.baseYearly)}<span class="per">pro Jahr</span></div>`;
     }
     return `<div class="price">${eur(p.baseMonthly)}<span class="per">pro Monat</span></div>`;
   }
@@ -889,7 +896,7 @@
     const owner = [a.vorname, a.nachname].filter(Boolean).join(" ").trim() || "—";
     const reader = readerLabel(a);
     const base = !p.hasBase ? "Keine Grundgebühr"
-      : state.billing === "yearly" ? `${eur(p.baseMonthly * (1 - YEARLY_DISCOUNT))} / Monat (jährlich)`
+      : state.billing === "yearly" ? `${eur(p.baseYearly)} / Jahr`
       : `${eur(p.baseMonthly)} / Monat`;
 
     card.innerHTML = `
@@ -1109,7 +1116,7 @@
         </div>
         <div class="callout info" style="margin:18px 24px 0">
           <h4>Letzter Schritt</h4>
-          <p>Schließe dein Onboarding mit deiner ersten Zahlung ab – so siehst du sofort, dass alles funktioniert.</p>
+          <p>Schließe die Einrichtung mit deiner ersten Zahlung ab – so siehst du sofort, dass alles funktioniert.</p>
         </div>
         <div class="actions">
           <button class="cta" id="firstpay">Erste Zahlung starten</button>
@@ -1194,7 +1201,7 @@
           <div class="kz-done">✓</div>
           <div class="kz-amt" style="margin-top:4px">${amt} bezahlt</div>
           <p style="font-size:14px;color:var(--body);margin:6px 0 0">Zahlung erfolgreich abgeschlossen.</p>
-          <div class="actions" style="padding:24px 0 0"><button class="cta" id="done">Onboarding abschließen</button></div>
+          <div class="actions" style="padding:24px 0 0"><button class="cta" id="done">Einrichtung abschließen</button></div>
         </div>
       </div>`;
     card.querySelector("#done").addEventListener("click", renderDone);
@@ -1205,7 +1212,7 @@
       <div class="result">
         <div class="band anim" style="background:var(--save)">
           <span class="badge">🎉 Fertig</span>
-          <h2 class="sol">Onboarding abgeschlossen!</h2>
+          <h2 class="sol">Einrichtung abgeschlossen!</h2>
           <p class="sol-sub">Tarif gewählt, Kartenlesegerät gekoppelt und die erste Zahlung lief durch. Du kannst jetzt loslegen.</p>
         </div>
         <div class="actions">
