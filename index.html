@@ -290,7 +290,9 @@
   .key { appearance: none; background: #161619; border: 1px solid #232327; border-radius: 12px; color: #fff; font-size: 23px; font-weight: 600; padding: 15px 0; cursor: pointer; transition: .1s; }
   .key:active { background: #28282d; transform: scale(.97); }
   .key.del { display: grid; place-items: center; font-size: 20px; }
-  .pay-btn { width: 100%; margin-top: 18px; appearance: none; border: none; border-radius: 14px; padding: 18px; font-family: var(--font); font-size: 17px; font-weight: 700; color: #8a8a90; background: #1f1f23; cursor: not-allowed; transition: .15s; }
+  .pay-hint { display: flex; gap: 9px; align-items: flex-start; background: rgba(57,166,216,.14); border: 1px solid rgba(57,166,216,.32); color: #bfe6f5; font-size: 12.5px; line-height: 1.45; border-radius: 11px; padding: 11px 13px; margin-top: 18px; }
+  .pay-hint .i { flex: none; }
+  .pay-btn { width: 100%; margin-top: 14px; appearance: none; border: none; border-radius: 14px; padding: 18px; font-family: var(--font); font-size: 17px; font-weight: 700; color: #8a8a90; background: #1f1f23; cursor: not-allowed; transition: .15s; }
   .pay-btn.on { color: #fff; background: linear-gradient(160deg, #39a6d8, #2f93c9); cursor: pointer; }
 
   /* ---- Kartenzahlung modal animation ---- */
@@ -1130,7 +1132,7 @@
   // ---- Mollie Tap app: amount entry ----
   function renderPaymentPad() {
     const acct = ((state.answers.firmenname || "Demo").trim()) + "_DemoAccount";
-    let cents = 0;
+    let cents = 1; // 1 Cent vorausgewählt zur Aktivierung
     const fmt = (c) => "€" + (c / 100).toFixed(2).replace(".", ",");
     const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button class="key" data-d="${n}">${n}</button>`).join("");
     card.innerHTML = `
@@ -1150,12 +1152,14 @@
             <button class="key" data-d="0">0</button>
             <button class="key del" data-del="1" aria-label="Löschen">⌫</button>
           </div>
+          <div class="pay-hint"><span class="i">ℹ️</span><span>Die erste Zahlung muss zur Aktivierung durchgeführt werden – du kannst einfach 1 Cent zahlen.</span></div>
           <button class="pay-btn" id="pay">Bezahlen</button>
         </div>
       </div>`;
     const amtEl = card.querySelector("#amt");
     const payBtn = card.querySelector("#pay");
     const update = () => { amtEl.textContent = fmt(cents); payBtn.classList.toggle("on", cents > 0); };
+    update();
     card.querySelectorAll(".key[data-d]").forEach((k) => k.addEventListener("click", () => {
       const d = k.dataset.d;
       cents = d === "00" ? Math.min(cents * 100, 9999999) : Math.min(cents * 10 + parseInt(d, 10), 9999999);
